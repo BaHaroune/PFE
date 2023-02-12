@@ -29,6 +29,7 @@ function Login() {
                     // console.log(response);
                 } else if (role === 'prestataire') {
                     // navigate('/prestataire')
+                    localStorage.setItem("prestataireId", response.data.user.prestataire_id);
                     window.location.href = '/prestataire';
                 } else if (role === 'admin') {
                     // navigate('/admin');

@@ -16,12 +16,12 @@ const app = express();
 app.use(express.json());
 app.use(cors({
     origin: 'http://localhost:3000',
-    methods: ["GET", "POST"],
+    methods: ["GET", "POST", "PUT"],
     credentials: true
 }));
 
 app.use(cookieParser());
-app.use(bodyParser.urlencoded({ extended: true }));
+app.use(bodyParser.urlencoded({ extended: true }));  
 
 app.use(session({
     key: 'user',
@@ -187,7 +187,7 @@ app.post("/offreService", (req, res) => {
                 if (err) {
                     console.log(err);
                 } else {
-                    console.log(result);
+                    // console.log(result);
                     res.send(result);
                 }
             }
@@ -205,7 +205,7 @@ app.get('/profile', (req, res) => {
     // console.log(token)
     try {
         const user = jwt.verify(token, secret);
-        // console.log(user);
+        console.log(user);
         res.send(user);
     } catch (err) {
         console.error(err);
@@ -213,12 +213,36 @@ app.get('/profile', (req, res) => {
     }
 });
 
-app.post("/offre", (req, res) => {
+app.get("/PrestataireInfo", (req, res) => {
+    try {
+        const prestataireId = req.query.prestataireId || req.body.prestataireId;
+        const sqlSelect = "SELECT * from prestataire WHERE prestataire_id = ?";
+        db.query(
+            sqlSelect,
+            [prestataireId],
+            (err, result) => {
+                if (err) {
+                    console.error(err);
+                    return res.status(500).send("Error while fetching prestataire information");
+                } else {
+                    if(result.length === 0){
+                        return res.status(404).send("Prestataire not found");
+                    }
+                    res.status(200).send(result[0]);
+                }
+            }
+        );
+    } catch (err) {
+        console.error(err);
+        return res.status(500).send("Error while fetching prestataire information");
+    }   
+});
 
+
+app.post("/offre", (req, res) => {
     const offreId = req.body.offreId
     const serviceId = req.body.serviceId
     const prestataireId = req.body.prestataireId
-
 
     const sqlInsert = "INSERT INTO offre (offre_id, service_id, prestataire_id) VALUES ( ?, ?, ?)";
     db.query(
@@ -228,28 +252,48 @@ app.post("/offre", (req, res) => {
             if (err) {
                 console.log(err);
             } else {
-                console.log(result);
+                // console.log(result);
                 res.send(result);
             }
-
         }
     );
 });
 
-app.get('/offre', (req, res) => {
-    const sqlInsert = "SELECT * from prestataire p, offre o where p.service_id = o.prestataire_id";
-    db.query(sqlInsert, (err, result) => {
-        if (err) {
-            console.log(err);
-        } else {
-            if (result.length > 0) {
-                res.send(result);
+app.get("/offre", (req, res) => {
+    const serviceId = req.query.serviceId || req.body.serviceId;
+    console.log(serviceId)
+    const sqlInsert = `SELECT p.prestataire_id, p.prenom, p.nom FROM prestataire p, service s, offre o WHERE p.prestataire_id = o.prestataire_id AND s.service_id = o.service_id AND s.service_id = ${serviceId}`;
+    db.query(
+        sqlInsert, 
+        (err, result)=> {
+            if(err){
+                console.log(err);
             } else {
-                res.send({ Message: "0 offre pour l'instant" });
+                if(result.length > 0){
+                    // console.log(result);
+                    res.send(result);
+                } else {
+                    res.send({message : "aucune offre pour l'instant"})
+                }
             }
         }
-    })
+    )
 })
+
+// app.get('/offre', (req, res) => {
+//     const sqlInsert = "SELECT * from prestataire p, offre o where p.service_id = o.service_id";
+//     db.query(sqlInsert, (err, result) => {
+//         if (err) {
+//             console.log(err);
+//         } else {
+//             if (result.length > 0) {
+//                 res.send(result);
+//             } else {
+//                 res.send({ Message: "0 offre pour l'instant" });
+//             }
+//         }
+//     })
+// })
 
 app.get('/getServiceCourants', (req, res) => {
     const sqlInsert = "SELECT * FROM loginsys.service s, loginsys.offre o where s.service_id = o.service_id";
@@ -301,7 +345,7 @@ app.get('/getServicesClient', (req, res) => {
                     console.log(err);
                 } else {
                     if (result.length > 0) {
-                        console.log(result);
+                        // console.log(result);
                         res.send(result);
                     } else {
                         console.log("aucun service pour l'instant");
@@ -350,7 +394,7 @@ app.post("/login", (req, res) => {
                                 if (response) {
                                     req.session.user = result[0];
                                     const token = jwt.sign({ role: 'prestataire', user: result[0] }, secret);
-                                    res.send({ role: 'prestataire', token: token });
+                                    res.send({ role: 'prestataire', token: token, user: result[0] });
                                 } else {
                                     res.send({ message: "Wrong password" });
                                 }
@@ -407,12 +451,36 @@ app.get('/user', (req, res) => {
 
 app.get('/admin', (req, res) => {
     if (req.session.user) {
-        console.log(req.session.user);
+        // console.log(req.session.user);
         res.send({ loggedIn: true, user: req.session.user })
     } else {
         res.send({ loggedIn: false });
     }
 })
+
+app.put('/updateProfile', (req, res) => {
+    const nom = req.query.nom || req.body.nom;
+    const prenom = req.query.prenom || req.body.prenom;
+    const email = req.query.email || req.body.email;
+    const age = req.query.age || req.body.age;
+    const tel = req.query.tel || req.body.tel;
+    const pays = req.query.pays || req.body.pays;
+    const ville = req.query.ville || req.body.ville;
+    const categorie = req.query.categorie || req.body.categorie;
+    const domaineComp = req.query.domaineComp || req.body.domaineComp;
+    const profile_desc = req.query.profile_desc || req.body.profile_desc;
+
+    const sqlUpdate = "UPDATE prestataire SET nom=?, prenom=?, email=?, age=?, tel=?, pays=?, ville=?, categorie=?, domaineComp=?, profile_desc=? WHERE email=?";
+    db.query(sqlUpdate, [nom, prenom, email, age, tel, pays, ville, categorie, domaineComp, profile_desc, email], (err, result) => {
+        if (err) {
+            console.log(err);
+            res.status(500).send({ error: "An error occurred while updating the profile" });
+        } else {
+            res.send({ message: "Profile updated successfully" });
+        }
+    });
+});
+
 
 app.listen(3001, () => {
     console.log("running on port 3001...")
